@@ -1,0 +1,8 @@
+{
+  "project_id": "your-gcp-project-id",
+  "bucket_name": "your-gs-bucket-name",
+  "gcs_blob_name": "crypto/raw/your_file.csv",
+  "dataset_bronze": "crypto_bronze",
+  "table_raw": "crypto_raw",
+  "local_file_path": "/path/to/your/local/kaggle_export.csv"
+}

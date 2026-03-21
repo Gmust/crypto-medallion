@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from dotenv import load_dotenv
+from google.auth.exceptions import DefaultCredentialsError
 from google.cloud import bigquery
 from google.cloud.exceptions import GoogleCloudError
 
@@ -98,6 +99,12 @@ def main() -> int:
             dataset_bronze,
             table_raw,
         )
+    except DefaultCredentialsError:
+        LOGGER.error(
+            "No Google credentials found. Run: gcloud auth application-default login\n"
+            "Or set GOOGLE_APPLICATION_CREDENTIALS in .env to a service account JSON path."
+        )
+        return 1
     except (GoogleCloudError, OSError) as e:
         LOGGER.error("%s", e)
         return 1

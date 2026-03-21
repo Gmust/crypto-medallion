@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 
 from dotenv import load_dotenv
+from google.auth.exceptions import DefaultCredentialsError
 from google.cloud import storage
 from google.cloud.exceptions import GoogleCloudError
 
@@ -73,6 +74,16 @@ def main() -> int:
 
     try:
         upload_file(project_id, bucket_name, blob_name, local_file)
+    except DefaultCredentialsError:
+        LOGGER.error(
+            "No Google credentials found for the Python client libraries.\n"
+            "  Option A — install gcloud, then run:\n"
+            "    gcloud auth application-default login\n"
+            "  Option B — add to .env (absolute path, file must exist):\n"
+            "    GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json\n"
+            "  Verify Option A with: gcloud auth application-default print-access-token"
+        )
+        return 1
     except (FileNotFoundError, GoogleCloudError, OSError) as e:
         LOGGER.error("%s", e)
         return 1

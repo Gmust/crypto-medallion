@@ -57,6 +57,10 @@ Thumbs.db
 *.swo
 *~
 
+# GCP service account keys (never commit)
+credentials/
+*-sa.json
+
 # Local datasets (large files stay out of git)
 /data/*.csv
 /data/*.zip

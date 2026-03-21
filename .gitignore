@@ -57,5 +57,8 @@ Thumbs.db
 *.swo
 *~
 
-# Project-specific: local config with real values
-bronze/config.json
+# Local datasets (large files stay out of git)
+/data/*.csv
+/data/*.zip
+/data/*.parquet
+/data/**/*.csv

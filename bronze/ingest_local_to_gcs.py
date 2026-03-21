@@ -1,29 +1,34 @@
 """
-Upload a local file to Google Cloud Storage using settings from a JSON config file.
+Upload a local file to Google Cloud Storage using variables from .env (repository root).
 """
 
 from __future__ import annotations
 
-import json
 import logging
-import sys
+import os
 from pathlib import Path
 
+from dotenv import load_dotenv
 from google.cloud import storage
 from google.cloud.exceptions import GoogleCloudError
 
 LOGGER = logging.getLogger(__name__)
 
-DEFAULT_CONFIG = Path(__file__).resolve().parent / "config.json"
+REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
-def load_config(path: Path) -> dict:
-    if not path.is_file():
-        raise FileNotFoundError(
-            f"Config not found: {path}. Copy config.example.json to config.json and edit."
+def load_env() -> None:
+    load_dotenv(REPO_ROOT / ".env")
+
+
+def require_env(name: str) -> str:
+    value = os.environ.get(name, "").strip()
+    if not value:
+        raise ValueError(
+            f"Missing or empty environment variable: {name}. "
+            "Copy .env.example to .env in the repo root and set values."
         )
-    with path.open(encoding="utf-8") as f:
-        return json.load(f)
+    return value
 
 
 def upload_file(
@@ -32,7 +37,12 @@ def upload_file(
     blob_name: str,
     local_path: Path,
 ) -> None:
-    local_path = local_path.expanduser().resolve()
+    local_path = local_path.expanduser()
+    if not local_path.is_absolute():
+        local_path = (REPO_ROOT / local_path).resolve()
+    else:
+        local_path = local_path.resolve()
+
     if not local_path.is_file():
         raise FileNotFoundError(f"Local file does not exist: {local_path}")
 
@@ -50,18 +60,15 @@ def main() -> int:
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
-    config_path = Path(
-        sys.argv[1] if len(sys.argv) > 1 else DEFAULT_CONFIG
-    ).expanduser()
+    load_env()
 
     try:
-        cfg = load_config(config_path)
-        project_id = cfg["project_id"]
-        bucket_name = cfg["bucket_name"]
-        blob_name = cfg["gcs_blob_name"]
-        local_file = Path(cfg["local_file_path"])
-    except (KeyError, json.JSONDecodeError) as e:
-        LOGGER.error("Invalid config: %s", e)
+        project_id = require_env("GCP_PROJECT_ID")
+        bucket_name = require_env("GCS_BUCKET_NAME")
+        blob_name = require_env("GCS_BLOB_NAME")
+        local_file = Path(require_env("LOCAL_FILE_PATH"))
+    except ValueError as e:
+        LOGGER.error("%s", e)
         return 1
 
     try:

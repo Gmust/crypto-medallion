@@ -11,11 +11,12 @@ Bronze holds **raw** cryptocurrency data exactly as delivered from the source (K
 
 ## Flow
 
-1. Download the Kaggle dataset locally (team policy: where to store it is up to you; paths go in config).
-2. Run `ingest_local_to_gcs.py` to upload the file to your GCS bucket.
-3. Run `load_gcs_to_bigquery.py` to load that object into a BigQuery table in the Bronze dataset.
+1. Download the Kaggle dataset locally (e.g. under `data/`; set `LOCAL_FILE_PATH` in `.env`).
+2. Copy `.env.example` to `.env` at the **repository root** and set `GCP_PROJECT_ID`, `GCS_*`, `BIGQUERY_*`, and `LOCAL_FILE_PATH`.
+3. Run `ingest_local_to_gcs.py` to upload the file to your GCS bucket.
+4. Run `load_gcs_to_bigquery.py` to load that object into a BigQuery table in the Bronze dataset.
 
-Adjust `config.json` (from `config.example.json`) for `project_id`, bucket, dataset, table name, and paths.
+Scripts load environment variables from `.env` via `python-dotenv` (never commit `.env`).
 
 ## Requirements
 

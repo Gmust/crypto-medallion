@@ -14,7 +14,8 @@ Educational Big Data project for class: a **Medallion** data pipeline on **Googl
 
 ```
 crypto-medallion/
-├── bronze/          # Ingestion scripts and Bronze config
+├── .env.example     # Template for local .env (copy to .env)
+├── bronze/          # Ingestion scripts
 ├── silver/          # SQL for cleaned Silver tables
 ├── gold/            # SQL for Gold analytics
 ├── infrastructure/  # GCP setup checklists and naming rules
@@ -36,7 +37,7 @@ See [docs/team-responsibilities.md](docs/team-responsibilities.md) for the full 
 ## Getting started
 
 1. **GCP**: Follow [infrastructure/gcp_setup_checklist.md](infrastructure/gcp_setup_checklist.md) and [infrastructure/naming_conventions.md](infrastructure/naming_conventions.md).
-2. **Bronze**: Copy `bronze/config.example.json` to `bronze/config.json`, fill in your project and paths, install deps (`pip install -r bronze/requirements.txt`), run ingest then load scripts (see [bronze/README.md](bronze/README.md)).
+2. **Bronze**: Copy `.env.example` to `.env` in the repo root, set GCP and paths, install deps (`pip install -r bronze/requirements.txt`), run ingest then load scripts (see [bronze/README.md](bronze/README.md)).
 3. **Silver / Gold**: Run SQL in BigQuery (or your SQL runner) against the datasets you created, adjusting table and column names to match your Kaggle file.
 
-Use a Python virtual environment and **never commit** secrets or `config.json` with real credentials (see `.gitignore`).
+Use a Python virtual environment and **never commit** `.env` (see `.gitignore`).

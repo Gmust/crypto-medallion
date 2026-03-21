@@ -1,23 +1,23 @@
 """
 Load a CSV object from GCS into a BigQuery Bronze table.
+Reads GCP settings from .env (repository root).
 Schema: uses autodetect by default; see SCHEMA definition below to pin columns after you inspect the CSV.
 """
 
 from __future__ import annotations
 
-import json
 import logging
-import sys
+import os
 from pathlib import Path
-
 from typing import Any, Optional
 
+from dotenv import load_dotenv
 from google.cloud import bigquery
 from google.cloud.exceptions import GoogleCloudError
 
 LOGGER = logging.getLogger(__name__)
 
-DEFAULT_CONFIG = Path(__file__).resolve().parent / "config.json"
+REPO_ROOT = Path(__file__).resolve().parent.parent
 
 # TODO: After inspecting your Kaggle CSV headers and types, optionally replace autodetect
 # with an explicit schema list, e.g.:
@@ -29,13 +29,18 @@ DEFAULT_CONFIG = Path(__file__).resolve().parent / "config.json"
 SCHEMA: Optional[list[Any]] = None  # None = autodetect
 
 
-def load_config(path: Path) -> dict:
-    if not path.is_file():
-        raise FileNotFoundError(
-            f"Config not found: {path}. Copy config.example.json to config.json and edit."
+def load_env() -> None:
+    load_dotenv(REPO_ROOT / ".env")
+
+
+def require_env(name: str) -> str:
+    value = os.environ.get(name, "").strip()
+    if not value:
+        raise ValueError(
+            f"Missing or empty environment variable: {name}. "
+            "Copy .env.example to .env in the repo root and set values."
         )
-    with path.open(encoding="utf-8") as f:
-        return json.load(f)
+    return value
 
 
 def run_load(
@@ -73,19 +78,16 @@ def main() -> int:
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
-    config_path = Path(
-        sys.argv[1] if len(sys.argv) > 1 else DEFAULT_CONFIG
-    ).expanduser()
+    load_env()
 
     try:
-        cfg = load_config(config_path)
-        project_id = cfg["project_id"]
-        bucket_name = cfg["bucket_name"]
-        gcs_blob_name = cfg["gcs_blob_name"]
-        dataset_bronze = cfg["dataset_bronze"]
-        table_raw = cfg["table_raw"]
-    except (KeyError, json.JSONDecodeError) as e:
-        LOGGER.error("Invalid config: %s", e)
+        project_id = require_env("GCP_PROJECT_ID")
+        bucket_name = require_env("GCS_BUCKET_NAME")
+        gcs_blob_name = require_env("GCS_BLOB_NAME")
+        dataset_bronze = require_env("BIGQUERY_DATASET_BRONZE")
+        table_raw = require_env("BIGQUERY_TABLE_RAW")
+    except ValueError as e:
+        LOGGER.error("%s", e)
         return 1
 
     try:

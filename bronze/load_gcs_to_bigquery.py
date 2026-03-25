@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from dotenv import load_dotenv
+from google.api_core.exceptions import BadRequest
 from google.auth.exceptions import DefaultCredentialsError
 from google.cloud import bigquery
 from google.cloud.exceptions import GoogleCloudError
@@ -104,6 +105,9 @@ def main() -> int:
             "No Google credentials found. Run: gcloud auth application-default login\n"
             "Or set GOOGLE_APPLICATION_CREDENTIALS in .env to a service account JSON path."
         )
+        return 1
+    except BadRequest as e:
+        LOGGER.error("Schema or data format issue during BigQuery load:\n%s", e)
         return 1
     except (GoogleCloudError, OSError) as e:
         LOGGER.error("%s", e)

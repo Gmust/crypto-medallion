@@ -23,7 +23,7 @@ Scripts load environment variables from `.env` via `python-dotenv` (never commit
 ```bash
 python -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
+pip install -r bronze\requirements.txt
 ```
 
 ## GCP authentication (local runs)

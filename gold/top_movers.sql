@@ -9,7 +9,10 @@
 -- Target: crypto_gold.daily_top_movers
 -- ============================================================================
 
-CREATE OR REPLACE TABLE `outstanding-map-490915-u5.crypto_gold.daily_top_movers` AS
+CREATE OR REPLACE TABLE outstanding-map-490915-u5.crypto_gold.daily_top_movers
+PARTITION BY trading_date
+CLUSTER BY coin_name, symbol
+AS
 
 WITH ranked_coins AS (
   SELECT
@@ -56,7 +59,7 @@ WITH ranked_coins AS (
       ORDER BY ABS(pct_change_24h)
     ) AS percentile_24h
   
-  FROM `outstanding-map-490915-u5.crypto_silver.clean_crypto`
+  FROM outstanding-map-490915-u5.crypto_silver.clean_crypto
   WHERE is_complete_record = TRUE
 )
 
@@ -117,9 +120,4 @@ SELECT
 
 FROM ranked_coins
 
-WHERE abs_change_24h IS NOT NULL
-
-ORDER BY
-  trading_date DESC,
-  abs_change_24h DESC,
-  coin_name ASC;
+WHERE abs_change_24h IS NOT NULL;

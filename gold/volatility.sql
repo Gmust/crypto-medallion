@@ -9,7 +9,10 @@
 -- Target: crypto_gold.volatility_analysis
 -- ============================================================================
 
-CREATE OR REPLACE TABLE `outstanding-map-490915-u5.crypto_gold.volatility_analysis` AS
+CREATE OR REPLACE TABLE outstanding-map-490915-u5.crypto_gold.volatility_analysis
+PARTITION BY trading_date
+CLUSTER BY coin_name, symbol, risk_category
+AS
 
 SELECT
   DATE(loaded_at) AS trading_date,
@@ -93,11 +96,6 @@ SELECT
   
   CURRENT_TIMESTAMP() AS gold_created_at
 
-FROM `outstanding-map-490915-u5.crypto_silver.clean_crypto`
+FROM outstanding-map-490915-u5.crypto_silver.clean_crypto
 
-WHERE is_complete_record = TRUE
-
-ORDER BY
-  trading_date DESC,
-  risk_score DESC,
-  coin_name ASC;
+WHERE is_complete_record = TRUE;

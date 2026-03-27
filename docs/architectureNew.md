@@ -2,15 +2,15 @@
 
 ## 1. Purpose
 
-This document explains the target Medallion architecture for the project and how data moves across **Bronze → Silver → Gold** using **Google Cloud Storage (GCS)** and **BigQuery**.
+This document how exactly project use Medallion architecture and how data moves across **Bronze → Silver → Gold** using **Google Cloud Storage (GCS)** and **BigQuery**.
 
-The goal of the architecture is to keep raw data separate from cleaned data and business-ready outputs, so the pipeline is easier to understand, validate, and extend.
+The goal of the project is to keep raw data separate from cleaned data and business-ready outputs, so the pipeline is easier to understand, validate, and extend.
 
 ---
 
 ## 2. High-level architecture
 
-The system follows a layered Medallion pattern:
+The system follows Medallion pattern:
 
 - **Bronze** stores raw ingested data with minimal transformation.
 - **Silver** stores cleaned and standardized data ready for analytical use.
@@ -44,12 +44,6 @@ The Bronze layer preserves source data in its raw form. It acts as the first dur
 - Makes it possible to reload downstream layers if logic changes.
 - Helps with debugging ingestion issues.
 
-**Example assets**
-
-- GCS object: `crypto/raw/<filename>.csv`
-- BigQuery dataset: `crypto_bronze`
-- BigQuery table: `crypto_raw`
-
 ---
 
 ### Silver layer
@@ -72,18 +66,13 @@ The Silver layer contains cleaned, typed, validated, and standardized data. This
 - Separates data quality logic from final business reporting.
 - Reduces repeated cleaning logic in downstream queries.
 
-**Example assets**
-
-- BigQuery dataset: `crypto_silver`
-- BigQuery table: `crypto_clean`
-
 ---
 
 ### Gold layer
 
 **Purpose**
 
-The Gold layer contains business-ready outputs optimized for reporting, dashboarding, and consumption by end users or analytical stakeholders.
+The Gold layer contains business-ready outputs optimized for reporting, dashboarding , and consumption by end users or analytical stakeholders.
 
 **What happens here**
 
@@ -91,22 +80,11 @@ The Gold layer contains business-ready outputs optimized for reporting, dashboar
 - Tables are shaped around clear analytical use cases.
 - Outputs may be persisted as tables or generated as reusable views/queries.
 
-**Examples from the provided templates**
-
-- `daily_summary`: per-symbol daily metrics such as average close, min low, max high, total volume.
-- `top_movers`: assets with the largest percentage price change over a selected period.
-- `volatility`: rolling volatility based on daily log returns.
-
 **Why it exists**
 
 - Gives consumers a stable and simple interface.
 - Hides row-level cleaning complexity.
 - Improves performance for repeated reporting use cases.
-
-**Example assets**
-
-- BigQuery dataset: `crypto_gold`
-- BigQuery tables: `daily_summary`, `top_movers`, `volatility`
 
 ---
 
@@ -182,18 +160,6 @@ This keeps the architecture modular and easier to maintain.
 +----------------------------------------------+
 ```
 
-A compact markdown version:
-
-```mermaid
-flowchart TD
-    A[Local CSV] --> B[GCS raw object]
-    B --> C[BigQuery Bronze: crypto_bronze.crypto_raw]
-    C --> D[BigQuery Silver: crypto_silver.crypto_clean]
-    D --> E[BigQuery Gold: daily_summary]
-    D --> F[BigQuery Gold: top_movers]
-    D --> G[BigQuery Gold: volatility]
-```
-
 ---
 
 ## 6. Naming conventions
@@ -234,11 +200,6 @@ Recommended pattern:
 
 - `crypto/raw/<filename>.csv`
 
-Possible future extensions:
-
-- `crypto/archive/<filename>.csv`
-- `crypto/reference/<filename>.csv`
-
 ### Branch naming
 
 Recommended Git branch patterns:
@@ -246,12 +207,6 @@ Recommended Git branch patterns:
 - `main`
 - `feature/<short-description>`
 - `fix/<short-description>`
-
-Examples:
-
-- `feature/bronze-ingest`
-- `feature/silver-cleaning`
-- `feature/gold-daily-summary`
 
 ---
 
@@ -302,92 +257,104 @@ Keep one responsibility per folder:
 
 ### How the pipeline is triggered
 
-Based on the current setup, the pipeline can be triggered in two main ways:
+The Pipeline can be started in **two simple ways**: **manually** or **on a schedule**.
 
-#### 1. Manual trigger
+The idea is always the same — data should move through the Medallion layers in the correct order:
 
-This is the simplest starting model.
+**GCS → Bronze → Silver → Gold**
 
-A user runs the steps manually in sequence:
+---
 
-1. Upload local file to GCS.
-2. Load GCS file into Bronze in BigQuery.
-3. Run Silver transformation.
-4. Run Gold transformation queries.
+### 1. Manual trigger
 
-**When manual is appropriate**
+This means a team member starts each step one after another:
 
-- Early development
-- Testing and debugging
-- Course or team projects with small-scale data
-- Occasional data refreshes
+1. Upload the local file to **Google Cloud Storage (GCS)**
+2. Load that file into the **Bronze** table in **BigQuery**
+3. Run the **Silver** transformation
+4. Run the **Gold** transformation queries
 
-#### 2. Scheduled trigger
+This is useful during development because it makes the process easier to test, debug, and understand step by step.
 
-This is the recommended operational model once the process stabilizes.
+---
 
-A scheduler can run the pipeline at fixed times, for example:
+### 2. Scheduled trigger
 
-- daily
-- hourly
-- weekly
+In this case, the process runs automatically at a defined interval, for example:
 
-In this model, the orchestration service triggers the ingestion and transformation sequence automatically.
+- every day
+- every hour
+- once per week
 
-**Typical scheduled flow**
+A scheduler or orchestration service starts the pipeline without requiring manual input.
 
-- Scheduler starts pipeline
-- Pipeline checks for input file or expected source object
-- Bronze load runs
-- Silver transformation runs
-- Gold tables are refreshed
-- Logs and status are recorded
+This is the setup for a production-like environment because it reduces repetitive manual work and makes the data flow more consistent.
 
-### Recommended orchestration behavior
+---
 
-Regardless of whether the trigger is manual or scheduled, orchestration should enforce the same dependency order:
+### Typical scheduled pipeline flow
 
-1. **GCS upload completed**
-2. **Bronze load succeeded**
-3. **Silver transformation succeeded**
-4. **Gold refresh succeeded**
+A scheduled run would look like this:
 
-### Minimum orchestration requirements
+- the scheduler starts the pipeline
+- the system checks whether the expected input file is available
+- the **Bronze** load starts
+- the **Silver** transformation runs
+- the **Gold** tables are refreshed
+- the system records logs and execution status
 
-The orchestrator should be able to answer these questions clearly:
+This ensures the pipeline behaves in a predictable and repeatable way.
+
+---
+
+### Recommended orchestration logic
+
+Whether the pipeline is started manually or automatically, it should always follow the same sequence.
+
+Each step depends on the previous one being completed successfully:
+
+1. **File uploaded to GCS**
+2. **Bronze load completed**
+3. **Silver transformation completed**
+4. **Gold layer refreshed**
+
+If one step fails, the next step should **not** continue automatically.
+
+This keeps the pipeline reliable and helps prevent incomplete or inconsistent data from reaching later layers.
+
+---
+
+### What orchestration make visible
+
+A good orchestration process should make it easy to understand **what happened during a run**.
+
+At minimum, it should clearly answer:
 
 - What started the pipeline?
 - Which file was processed?
-- Did Bronze complete successfully?
-- Did Silver complete successfully?
-- Did Gold complete successfully?
-- If a step failed, where did it fail?
+- Did the **Bronze** step finish successfully?
+- Did the **Silver** step finish successfully?
+- Did the **Gold** step finish successfully?
+- If something failed, **where** did it fail?
 
-### Suggested operational model for this project
-
-For clarity and simplicity:
-
-- **Development mode**: manual execution
-- **Production or demo mode**: scheduled execution
-
-This gives the team a simple workflow during implementation and a more repeatable workflow later.
+This is important both for debugging and for basic operational control.
 
 ---
+
+### Recommended approach for this project
+
+For this project, the most practical setup is:
+
+- **Development mode** → run the pipeline manually
+- **Demo / production-like mode** → run the pipeline on a schedule
+
+This gives the team a workflow that is easy to manage during implementation, while also showing how the solution could work in a more automated real-world setup.
 
 ## 9. Environment variables used by the current flow
 
 The provided ingestion scripts already imply a parameterized setup through `.env`.
 
-Important variables include:
-
-- `GCP_PROJECT_ID`
-- `GCS_BUCKET_NAME`
-- `GCS_BLOB_NAME`
-- `LOCAL_FILE_PATH`
-- `BIGQUERY_DATASET_BRONZE`
-- `BIGQUERY_TABLE_RAW`
-
-These variables make the architecture easier to move between environments without changing logic.
+File named `.env.example` contains all needed variables
 
 ---
 
@@ -408,4 +375,4 @@ The design is simple, modular, and easy to document:
 - folder responsibilities are clear,
 - orchestration can begin manually and later move to a schedule.
 
-This structure is suitable for a team project because it improves readability, division of responsibilities, and maintainability.
+---

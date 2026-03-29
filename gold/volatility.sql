@@ -1,32 +1,101 @@
--- Gold: simple volatility-style metric using daily log returns (template).
--- TODO: Replace references; confirm price_date ordering and one row per symbol per day in Silver.
+-- ============================================================================
+-- GOLD LAYER: Volatility Analysis
+-- ============================================================================
+-- Purpose:
+--   Measure price volatility per coin across multiple timeframes.
+--   Identifies high-risk and stable coins for portfolio planning.
+--
+-- Source: crypto_silver.clean_crypto
+-- Target: crypto_gold.volatility_analysis
+-- ============================================================================
 
-WITH ordered AS (
-  SELECT
-    symbol,
-    price_date,
-    close_price,
-    LAG(close_price) OVER (PARTITION BY symbol ORDER BY price_date) AS prev_close
-  FROM `your-gcp-project.crypto_silver.crypto_clean`
-  WHERE close_price IS NOT NULL AND close_price > 0
-),
-returns AS (
-  SELECT
-    symbol,
-    price_date,
-    LN(close_price) - LN(prev_close) AS log_return
-  FROM ordered
-  WHERE prev_close IS NOT NULL AND prev_close > 0
-)
--- Rolling stddev of log returns over N days per symbol (example N = 7).
+CREATE OR REPLACE TABLE outstanding-map-490915-u5.crypto_gold.volatility_analysis
+PARTITION BY trading_date
+CLUSTER BY coin_name, symbol, risk_category
+AS
+
 SELECT
+  DATE(loaded_at) AS trading_date,
+  rank,
+  coin_name,
   symbol,
-  price_date,
-  STDDEV_SAMP(log_return) OVER (
-    PARTITION BY symbol
-    ORDER BY price_date
-    ROWS BETWEEN 6 PRECEDING AND CURRENT ROW
-  ) AS rolling_volatility_7d
-FROM returns
--- TODO: Materialize into a Gold table if needed:
--- CREATE OR REPLACE TABLE `your-gcp-project.crypto_gold.volatility` AS ...
+  ROUND(price_usd, 4) AS price_usd,
+  ROUND(market_cap_usd, 2) AS market_cap_usd,
+  
+  -- ======================================================================
+  -- DAILY PRICE CHANGES
+  -- ======================================================================
+  ROUND(COALESCE(pct_change_1h, 0), 2) AS pct_change_1h,
+  ROUND(pct_change_24h, 2) AS pct_change_24h,
+  ROUND(pct_change_7d, 2) AS pct_change_7d,
+  ROUND(pct_change_30d, 2) AS pct_change_30d,
+  
+  -- ======================================================================
+  -- MULTI-TIMEFRAME VOLATILITY (Absolute Changes)
+  -- ======================================================================
+  ROUND(ABS(COALESCE(pct_change_1h, 0)), 2) AS abs_change_1h,
+  ROUND(ABS(pct_change_24h), 2) AS abs_change_24h,
+  ROUND(ABS(pct_change_7d), 2) AS abs_change_7d,
+  ROUND(ABS(pct_change_30d), 2) AS abs_change_30d,
+  
+  -- Max absolute change across all timeframes
+  ROUND(
+    GREATEST(
+      ABS(COALESCE(pct_change_1h, 0)),
+      ABS(pct_change_24h),
+      ABS(pct_change_7d),
+      ABS(pct_change_30d)
+    ),
+    2
+  ) AS max_abs_change_all_timeframes,
+  
+  -- ======================================================================
+  -- VOLATILITY CLASSIFICATION (Risk Levels)
+  -- ======================================================================
+  CASE
+    WHEN ABS(pct_change_24h) > 20
+      OR ABS(pct_change_7d) > 50
+      OR ABS(pct_change_30d) > 100
+      THEN 'Extreme Risk'
+    WHEN ABS(pct_change_24h) > 10
+      OR ABS(pct_change_7d) > 25
+      THEN 'High Risk'
+    WHEN ABS(pct_change_24h) > 5
+      OR ABS(pct_change_7d) > 10
+      THEN 'Moderate Risk'
+    ELSE 'Low Risk'
+  END AS risk_category,
+  
+  -- ======================================================================
+  -- TREND DIRECTION (Multi-timeframe Analysis)
+  -- ======================================================================
+  CASE
+    WHEN pct_change_24h > 0 AND pct_change_7d > 0 AND pct_change_30d > 0
+      THEN 'Consistent Uptrend'
+    WHEN pct_change_24h < 0 AND pct_change_7d < 0 AND pct_change_30d < 0
+      THEN 'Consistent Downtrend'
+    WHEN pct_change_24h > 0 AND pct_change_7d < 0
+      THEN 'Short-term Rebound'
+    WHEN pct_change_24h < 0 AND pct_change_7d > 0
+      THEN 'Short-term Pullback'
+    ELSE 'Mixed Trend'
+  END AS trend_classification,
+  
+  -- ======================================================================
+  -- COMPOSITE RISK SCORE (0-100)
+  -- ======================================================================
+  ROUND(
+    LEAST(100,
+      (ABS(pct_change_24h) / 20 * 25) +           -- 25% weight on 24h volatility
+      (ABS(pct_change_7d) / 50 * 35) +            -- 35% weight on 7d volatility
+      (ABS(pct_change_30d) / 100 * 25) +          -- 25% weight on 30d volatility
+      (CASE WHEN pct_change_24h < 0 THEN 15 ELSE 0 END)  -- 15% if negative 24h
+    ),
+    2
+  ) AS risk_score,
+  
+  CURRENT_TIMESTAMP() AS gold_created_at
+
+FROM outstanding-map-490915-u5.crypto_silver.clean_crypto
+
+WHERE is_complete_record = TRUE;
